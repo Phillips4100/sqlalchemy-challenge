@@ -1,15 +1,15 @@
 import numpy as np
 import sqlalchemy
 import pandas as pd
+import datetime as dt
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 from flask import Flask, jsonify, request
 
-
-
 # Database Setup
 engine = create_engine("sqlite:///Resources/hawaii.sqlite")
+session = Session(engine)
 
 # reflect an existing database into a new model
 Base = automap_base()
@@ -32,15 +32,18 @@ app = Flask(__name__)
 @app.route("/")
 def home():
     """List all available api routes."""
-    return (
-        f"Available Routes:<br/>"
-        f"/api/v1.0/precipitation<br/>"
-        f"/api/v1.0/station<br/>"
-        f"/api/v1.0/waihee_tobs<br/>"
-        f"/api/v1.0/date<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end>"
-    )
+    return """
+         <html>
+             <body>
+                 <h3>Available Routes:</h3>
+                 <a href="http://127.0.0.1:5000/api/v1.0/precipitation" target="_blank">/api/v1.0/precipitation:</a><a1>  --Returns all precipitation measurments</a1><br>
+                 <a href="http://127.0.0.1:5000/api/v1.0/station" target="_blank">/api/v1.0/station</a><a1>  --Returns all measurment stations.</a1><br>
+                 <a href="http://127.0.0.1:5000/api/v1.0/waihee_tobs" target="_blank">/api/v1.0/waihee_tobs</a><a1>  --Returns date and temperature observations of the most active station for the last year of data.</a1><br>
+                 <a>/api/v1.0/date/"(YYYY-MM-DD)</a><a1>  --Returns the temperature Average Maximum and Minimums for all dates greater than and equal to the date given</a1><br>
+                 <a>/api/v1.0/date/"(YYYY-MM-DD)"/"(YYYY-MM-DD)</a><a1>  --Returns the temperature Average Maximum and Minimums for dates between the start and end date. </a1>
+             </body>
+         </html>
+     """
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
@@ -51,16 +54,16 @@ def precipitation():
     return jsonify(prcp_data)
 
 @app.route("/api/v1.0/station")
-def measurement():
+def stations():
     session = Session(engine)
     result = session.query(station.station, station.name).all()
     session.close()
 
     # Convert list of tuples into dict
     stats = {}
-    stations = (Convert(result, stats))
+    station_list = (Convert(result, stats))
 
-    return jsonify(stations)
+    return jsonify(station_list)
 
 @app.route("/api/v1.0/waihee_tobs")
 def tobs():
@@ -70,34 +73,59 @@ def tobs():
 
     return jsonify(waihee_tobs_data)
 
-@app.route("/api/v1.0/date")
-def getdate():
-    return """
-        <html>
-            <body>
-                <h3>When is your trip?</h3>
-                <form action = "/date">
-                    Enter your start date (YYYY-MM-DD):<br>
-                    <input type = 'text' name = 'start'><br>
-                    <input type = 'submit' value = 'continue'>
-                </form>
-            </body>
-        </html>
-    """
+@app.route("/api/v1.0/date/<start>")
+def tstart(start):
 
-@app.route("/api/v1.0/date<start>")
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).order_by(measurement.date.desc()).all()
 
-def get_temp():
-    try:
-        start = request.form.get('start')
+    session.close()
+  
+    for temps in results:
+        dict = {"Minimum Temp":results[0][0],"Average Temp":results[0][1],"Maximum Temp":results[0][2]}
 
-    result2 = engine.execute(f'SELECT MAX(tobs) AS max,  AVG(tobs) AS avg, MIN(tobs) as min FROM measurement Where measurement.date > {Start}').fetchall()
-    start_tobs = list(*result2)
+    return jsonify(dict)
 
-    except:
-    (f'Date not found')
+@app.route("/api/v1.0/date/<start>/<end>")
+def tstartend(start,end):
 
-    return jsonify(start_tobs)
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start, measurement.date <= end).order_by(measurement.date.desc()).all()
+
+    session.close()
+
+    for temps in results:
+        dict = {"Minimum Temp":results[0][0],"Average Temp":results[0][1],"Maximum Temp":results[0][2]}
+
+    return jsonify(dict)
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+# @app.route("/api/v1.0/date/<start>")
+# def get_temp(start):
+   
+#     # start_date = request.form.get('start')
+#     start_dt = datetime.strptime(start, '%Y-%m-%d')
+
+#     result2 = engine.execute(SELECT MAX(measurment.tobs),  AVG(measurement.tobs), MIN(measurement.tobs) FROM measurement WHERE measurement.date >= start_dt GROUP BY measurement.date).fetchall()
+#     start_tobs = list(*result2)
+#     return jsonify(start_tobs)
+
+    # request.form['start']
+    # start = request.args.get('start')
+
+# @app.route("/api/v1.0/date")
+# def getdate():
+#     return """
+#         <html>
+#             <body>
+#                 <h3>When is your trip?</h3>
+#                 <form ="startdate" action="/api/v1.0/date/" method="GET">
+#                     Enter your start date (YYYY-MM-DD):<br>
+#                     <input name = 'start'><br>
+#                     <input type = 'submit' value = 'continue'>
+#                 </form>
+#             </body>
+#         </html>
+#     """
+                # <form action = "/date/" >
